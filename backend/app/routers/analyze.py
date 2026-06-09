@@ -9,7 +9,12 @@ if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
 
 from app.services.ai_commentary import generate_commentaries_batch
-from app.services.supabase_store import update_analysis, get_analysis, _get_client
+from app.services.supabase_store import (
+    update_analysis,
+    get_analysis,
+    set_analysis_step,
+    _get_client as _get_supabase,
+)
 from parsers.fec_parser import FECParser
 from parsers.pdf_extractor import PDFExtractor
 from parsers.mapping import MAPPING
@@ -28,28 +33,36 @@ def _row_to_dict(row: ReconciliationRow, comment: str) -> dict:
 async def _run_analysis(analysis_id: str):
     try:
         update_analysis(analysis_id, "processing")
+        sb = _get_supabase()
 
-        sb = _get_client()
-        # Try xlsx first (new uploads), fall back to txt (legacy records)
+        # ── Step 1: Download + parse FEC ────────────────────────────────────
+        set_analysis_step(analysis_id, "parsing_fec")
         try:
             fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.xlsx")
         except Exception:
             fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.txt")
-        pdf_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/plaquette.pdf")
-
         fec_result = FECParser.from_bytes(fec_bytes)
+
+        # ── Step 2: Download + extract PDF ──────────────────────────────────
+        set_analysis_step(analysis_id, "extracting_pdf")
+        pdf_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/plaquette.pdf")
         pdf_result = PDFExtractor.from_bytes(pdf_bytes)
 
+        # ── Step 3: Reconcile ────────────────────────────────────────────────
+        set_analysis_step(analysis_id, "reconciling")
         rows = reconcile(fec_result, pdf_result, MAPPING)
+
+        # ── Step 4: Generate commentaries (single batch API call) ────────────
+        set_analysis_step(analysis_id, "generating_comments")
         comments = await generate_commentaries_batch(rows)
 
+        # ── Persist results ──────────────────────────────────────────────────
         results = {
             "rows": [_row_to_dict(r, c) for r, c in zip(rows, comments)],
-            "fec_errors": fec_result.errors,
+            "fec_errors":    fec_result.errors,
             "fec_row_count": fec_result.row_count,
-            "pdf_sections": {k: v.get("confidence") for k, v in pdf_result.sections.items()},
+            "pdf_sections":  {k: v.get("confidence") for k, v in pdf_result.sections.items()},
         }
-
         update_analysis(analysis_id, "done", results)
 
     except Exception as exc:  # noqa: BLE001

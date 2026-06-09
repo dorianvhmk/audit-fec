@@ -37,6 +37,7 @@ Returned structure
 
 from __future__ import annotations
 
+import hashlib
 import io
 import re
 import unicodedata
@@ -45,6 +46,14 @@ from pathlib import Path
 from typing import Literal
 
 import pdfplumber
+
+# ---------------------------------------------------------------------------
+# In-process extraction cache (keyed by SHA-256 of the raw PDF bytes)
+# Avoids re-parsing the same PDF within the same process lifetime, e.g.
+# during development restarts or if analyze is triggered twice.
+# ---------------------------------------------------------------------------
+
+_EXTRACTION_CACHE: dict[str, dict] = {}  # sha256 hex → extracted tables dict
 
 # ---------------------------------------------------------------------------
 # Type aliases
@@ -416,6 +425,10 @@ def extract_plaquette_data(pdf_bytes: bytes) -> dict[str, dict]:
     """
     Parse a plaquette PDF and return financial tables.
 
+    Results are cached in-process by SHA-256 of the raw bytes — repeated
+    calls with the same PDF (e.g. dev restarts, duplicate triggers) skip
+    the full pdfplumber extraction.
+
     Returns
     -------
     dict with keys "bilan_actif", "bilan_passif", "compte_de_resultat"
@@ -427,6 +440,9 @@ def extract_plaquette_data(pdf_bytes: bytes) -> dict[str, dict]:
             "source":     "table" | "text",
         }
     """
+    cache_key = hashlib.sha256(pdf_bytes).hexdigest()
+    if cache_key in _EXTRACTION_CACHE:
+        return _EXTRACTION_CACHE[cache_key]
     accumulated: dict[str, list[Row]] = {}
     best_confidence: dict[str, float] = {}
     best_source: dict[str, str] = {}
@@ -500,6 +516,7 @@ def extract_plaquette_data(pdf_bytes: bytes) -> dict[str, dict]:
                 "source":     best_source.get(section, "table"),
             }
 
+    _EXTRACTION_CACHE[cache_key] = result  # store in process-level cache
     return result
 
 

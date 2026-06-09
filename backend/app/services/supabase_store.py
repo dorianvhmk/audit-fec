@@ -20,6 +20,31 @@ from typing import Any
 from supabase import create_client, Client
 from app.config import settings
 
+# ---------------------------------------------------------------------------
+# In-process step tracker (background task and HTTP handler share the same
+# process on Railway, so a module-level dict is sufficient)
+# ---------------------------------------------------------------------------
+
+#: Human-readable step labels — order defines the progress bar sequence.
+STEP_LABELS: dict[str, str] = {
+    "parsing_fec":         "Lecture du FEC",
+    "extracting_pdf":      "Extraction de la plaquette PDF",
+    "reconciling":         "Rapprochement des données",
+    "generating_comments": "Génération des commentaires IA",
+}
+
+_step_registry: dict[str, str] = {}  # analysis_id → current step key
+
+
+def set_analysis_step(analysis_id: str, step: str) -> None:
+    """Record the current pipeline step for an in-flight analysis."""
+    _step_registry[analysis_id] = step
+
+
+def get_analysis_step(analysis_id: str) -> str | None:
+    """Return the current step key, or None if not yet set / already done."""
+    return _step_registry.get(analysis_id)
+
 _client: Client | None = None
 
 

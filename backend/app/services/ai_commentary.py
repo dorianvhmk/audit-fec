@@ -1,10 +1,22 @@
 """
-Generate French audit commentary for each reconciliation row using Claude.
+Batch French audit commentary generation using Claude (single API call).
+
+All non-OK reconciliation rows are sent in ONE Anthropic API call using
+forced tool-use output — no per-row calls, no asyncio loops.
+
+Public interface (unchanged for analyze.py):
+    await generate_commentaries_batch(rows) → list[str]
+    Returns one commentary string per row in the SAME ORDER as `rows`.
+    OK rows receive "". All anomalies are covered in the single batch call.
 """
 
 from __future__ import annotations
 
-import sys, os
+import asyncio
+import logging
+import os
+import sys
+
 _BACKEND = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
@@ -12,6 +24,77 @@ if _BACKEND not in sys.path:
 import anthropic
 from app.config import settings
 from schemas import ReconciliationRow
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+_MODEL = "claude-sonnet-4-6"
+
+_SYSTEM_PROMPT = """\
+Tu es commissaire aux comptes (CAC) chargé d'un audit légal en France.
+Tu analyses les écarts entre le FEC (Fichier des Écritures Comptables) et la
+plaquette financière annuelle de l'entreprise auditée.
+
+Pour chaque poste qui t'est soumis (statut "écart", "erreur" ou "absent"),
+tu rédiges un commentaire d'audit en français en 1 à 2 phrases qui :
+1. Identifie la cause probable de l'écart
+2. Indique le niveau de risque d'audit : faible, moyen ou élevé
+3. Propose une diligence d'audit concrète (circularisation, revue analytique, etc.)
+
+Règles :
+- Vocabulaire technique comptable français (PCG, normes ISA/NEP)
+- Factuel et précis ; pas d'hypothèses non étayées par les chiffres
+- Statut "absent" → risque minimum "moyen" (aucun compte FEC trouvé)
+- Statut "erreur" (écart ≥ 5 %) → risque minimum "élevé"
+- Statut "écart" (1–5 %) → évalue le risque selon le montant absolu
+"""
+
+# Forced tool-use schema — Claude MUST fill every slot in the array.
+_SUBMIT_TOOL: dict = {
+    "name": "soumettre_commentaires",
+    "description": (
+        "Soumettre les commentaires d'audit pour tous les postes analysés. "
+        "Chaque entrée correspond à un poste fourni, dans le même ordre."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "commentaires": {
+                "type": "array",
+                "description": "Un commentaire par poste, dans le même ordre que la liste fournie.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {
+                            "type": "string",
+                            "description": "Label exact du poste (identique à celui fourni).",
+                        },
+                        "commentary": {
+                            "type": "string",
+                            "description": (
+                                "Commentaire d'audit en 1-2 phrases : cause probable, "
+                                "niveau de risque (faible/moyen/élevé), diligence recommandée."
+                            ),
+                        },
+                        "risk_level": {
+                            "type": "string",
+                            "enum": ["faible", "moyen", "élevé"],
+                        },
+                    },
+                    "required": ["label", "commentary", "risk_level"],
+                },
+            }
+        },
+        "required": ["commentaires"],
+    },
+}
+
+# ---------------------------------------------------------------------------
+# Anthropic client (lazy singleton)
+# ---------------------------------------------------------------------------
 
 _client: anthropic.Anthropic | None = None
 
@@ -23,53 +106,130 @@ def _get_client() -> anthropic.Anthropic:
     return _client
 
 
-_SYSTEM_PROMPT = """\
-Tu es un expert-comptable et auditeur légal français. Tu rédiges des commentaires \
-d'audit concis (2-3 phrases maximum) sur les écarts de rapprochement entre le FEC \
-et la plaquette financière. Ton ton est professionnel et factuel. Tu utilises le \
-vouvoiement institutionnel. Tu ne fais pas de suppositions non étayées par les chiffres.\
-"""
+# ---------------------------------------------------------------------------
+# Prompt builder
+# ---------------------------------------------------------------------------
+
+def _fmt_amount(v: float | None) -> str:
+    return "N/D" if v is None else f"{v:,.0f} €".replace(",", " ")
 
 
-def _build_user_prompt(row: ReconciliationRow) -> str:
-    plaquette = f"{row.plaquette_amount:,.2f} €" if row.plaquette_amount is not None else "non disponible"
-    fec = f"{row.fec_amount:,.2f} €" if row.fec_amount is not None else "non calculable"
-    delta_str = f"{row.delta_abs:+,.2f} €" if row.delta_abs is not None else "N/A"
-    pct_str = f"{row.delta_pct:.2f} %" if row.delta_pct is not None else "N/A"
+def _build_prompt(rows: list[ReconciliationRow]) -> str:
+    lines: list[str] = [f"Analyse des {len(rows)} poste(s) en anomalie :\n"]
+    for i, row in enumerate(rows, start=1):
+        if row.delta_abs is not None and row.delta_pct is not None:
+            delta = (
+                f"{row.delta_abs:+,.0f} € ({row.delta_pct:.1f} %)"
+                .replace(",", " ")
+            )
+        else:
+            delta = "N/D"
+        comptes = ", ".join(row.matched_accounts[:8])
+        if len(row.matched_accounts) > 8:
+            comptes += f" … (+{len(row.matched_accounts) - 8})"
 
-    return (
-        f"Poste : {row.label}\n"
-        f"Section : {row.section}\n"
-        f"Montant plaquette (N) : {plaquette}\n"
-        f"Montant FEC calculé : {fec}\n"
-        f"Écart absolu (FEC − plaquette) : {delta_str}\n"
-        f"Écart relatif : {pct_str}\n"
-        f"Statut : {row.status}\n\n"
-        "Rédige un commentaire d'audit en français pour ce poste."
+        lines.append(
+            f"[{i}] {row.label}\n"
+            f"    Section     : {row.section}\n"
+            f"    Plaquette N : {_fmt_amount(row.plaquette_amount)}\n"
+            f"    FEC calculé : {_fmt_amount(row.fec_amount)}\n"
+            f"    Écart       : {delta}\n"
+            f"    Statut      : {row.status}\n"
+            + (f"    Comptes FEC : {comptes}\n" if comptes else "")
+        )
+    lines.append(
+        "\nUtilise l'outil `soumettre_commentaires` pour retourner "
+        "un commentaire pour chacun des postes ci-dessus, dans le même ordre."
     )
+    return "\n".join(lines)
 
 
-def generate_commentary(row: ReconciliationRow) -> str:
+# ---------------------------------------------------------------------------
+# Single batch Claude call (synchronous — run in executor from async context)
+# ---------------------------------------------------------------------------
+
+def _call_claude_batch(anomaly_rows: list[ReconciliationRow]) -> dict[str, str]:
+    """
+    Call Claude once with all anomaly rows.
+    Returns {label: commentary} mapping.
+    Falls back to placeholder strings on API error.
+    """
     client = _get_client()
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=256,
-        system=_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": _build_user_prompt(row)}],
-    )
-    return message.content[0].text.strip()
+    prompt = _build_prompt(anomaly_rows)
 
+    try:
+        response = client.messages.create(
+            model=_MODEL,
+            max_tokens=4096,
+            system=_SYSTEM_PROMPT,
+            tools=[_SUBMIT_TOOL],
+            tool_choice={"type": "tool", "name": "soumettre_commentaires"},
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except anthropic.APIError as exc:
+        logger.error("Anthropic API error during batch commentary: %s", exc)
+        return {
+            row.label: f"[Commentaire indisponible — erreur API: {exc}]"
+            for row in anomaly_rows
+        }
+
+    # Extract tool_use block — guaranteed present because we forced it
+    tool_input: dict | None = None
+    for block in response.content:
+        if block.type == "tool_use" and block.name == "soumettre_commentaires":
+            tool_input = block.input
+            break
+
+    if tool_input is None:
+        logger.error(
+            "No tool_use block returned (stop_reason=%s). Using placeholders.",
+            response.stop_reason,
+        )
+        return {row.label: "[Commentaire non disponible]" for row in anomaly_rows}
+
+    raw: list[dict] = tool_input.get("commentaires", [])
+
+    # Build label → commentary dict (order-safe via label key)
+    result: dict[str, str] = {}
+    for item in raw:
+        if isinstance(item, dict) and "label" in item:
+            result[item["label"]] = item.get("commentary", "[vide]")
+
+    # Fill any gaps (label not returned by model)
+    for row in anomaly_rows:
+        if row.label not in result:
+            logger.warning("No commentary returned for %r — using placeholder.", row.label)
+            result[row.label] = "[Commentaire non disponible]"
+
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Public async interface (called by analyze.py)
+# ---------------------------------------------------------------------------
 
 async def generate_commentaries_batch(rows: list[ReconciliationRow]) -> list[str]:
-    """Generate commentary for all rows; on error, return a placeholder string."""
-    import asyncio
+    """
+    Generate audit commentaries for all rows in a single API call.
 
+    Parameters
+    ----------
+    rows : list[ReconciliationRow]
+        All reconciliation rows (OK rows are silently skipped and receive "").
+
+    Returns
+    -------
+    list[str]
+        One commentary string per row, same order as `rows`.
+        OK rows → empty string.
+        All anomaly rows handled in one Anthropic API call.
+    """
+    anomaly_rows = [r for r in rows if r.status != "OK"]
+    if not anomaly_rows:
+        return [""] * len(rows)
+
+    # Run the synchronous Claude call off the event loop thread
     loop = asyncio.get_event_loop()
-    results: list[str] = []
-    for row in rows:
-        try:
-            comment = await loop.run_in_executor(None, generate_commentary, row)
-        except Exception as exc:  # noqa: BLE001
-            comment = f"[Erreur lors de la génération du commentaire : {exc}]"
-        results.append(comment)
-    return results
+    comment_map = await loop.run_in_executor(None, _call_claude_batch, anomaly_rows)
+
+    return [comment_map.get(row.label, "") for row in rows]

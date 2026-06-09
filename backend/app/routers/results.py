@@ -4,7 +4,12 @@ from fastapi.responses import StreamingResponse
 import openpyxl
 from openpyxl.styles import PatternFill, Font
 
-from app.services.supabase_store import get_analysis, list_analyses
+from app.services.supabase_store import (
+    get_analysis,
+    list_analyses,
+    get_analysis_step,
+    STEP_LABELS,
+)
 
 router = APIRouter(tags=["results"])
 
@@ -14,6 +19,62 @@ _STATUS_COLORS = {
     "erreur": "FFC7CE",  # red
     "absent": "E0E0E0",  # gray
 }
+
+
+@router.get("/progress/{analysis_id}")
+def get_progress(analysis_id: str):
+    """
+    Return the current pipeline step for an in-flight analysis.
+
+    Response shape::
+
+        {
+          "status":          "pending" | "processing" | "done" | "error",
+          "step":            "parsing_fec" | "extracting_pdf" | "reconciling"
+                             | "generating_comments" | "done" | "",
+          "step_label":      str,        # human-readable French label
+          "steps_completed": int,        # 0-based count of finished steps
+          "steps_total":     int,        # total number of steps (4)
+        }
+    """
+    record = get_analysis(analysis_id)
+    if not record:
+        raise HTTPException(404, "Analyse introuvable")
+
+    status = record["status"]
+    step_keys = list(STEP_LABELS.keys())
+    n_steps = len(step_keys)
+
+    if status == "done":
+        return {
+            "status": "done",
+            "step": "done",
+            "step_label": "Terminé",
+            "steps_completed": n_steps,
+            "steps_total": n_steps,
+        }
+
+    if status == "error":
+        step = get_analysis_step(analysis_id) or ""
+        idx = step_keys.index(step) if step in step_keys else 0
+        return {
+            "status": "error",
+            "step": step,
+            "step_label": STEP_LABELS.get(step, "Erreur"),
+            "steps_completed": idx,
+            "steps_total": n_steps,
+        }
+
+    # pending or processing
+    step = get_analysis_step(analysis_id) or ""
+    idx = (step_keys.index(step) + 1) if step in step_keys else 0
+    return {
+        "status": status,
+        "step": step,
+        "step_label": STEP_LABELS.get(step, "Initialisation…"),
+        "steps_completed": idx,
+        "steps_total": n_steps,
+    }
 
 
 @router.get("/analyses")

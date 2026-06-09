@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useAnalysis, ReconciliationRow, RowStatus, API } from "../hooks/useAnalysis";
+import { useAnalysis, useProgress, ReconciliationRow, RowStatus, API } from "../hooks/useAnalysis";
 import StatusBadge from "../components/StatusBadge";
 import CommentDrawer from "../components/CommentDrawer";
 
@@ -30,7 +30,7 @@ const CARD_NUM_COLOR: Record<RowStatus, string> = {
   OK:     "text-emerald-400",
 };
 
-// ── Spinner ───────────────────────────────────────────────────────────────────
+// ── Spinner (initial load only) ───────────────────────────────────────────────
 
 function Spinner() {
   return (
@@ -44,32 +44,115 @@ function Spinner() {
   );
 }
 
+// ── Step-progress pipeline display ───────────────────────────────────────────
+
+const PIPELINE_STEPS = [
+  { key: "parsing_fec",         label: "Lecture du FEC" },
+  { key: "extracting_pdf",      label: "Extraction PDF" },
+  { key: "reconciling",         label: "Rapprochement" },
+  { key: "generating_comments", label: "Commentaires IA" },
+] as const;
+
+interface ProgressDisplayProps {
+  step: string;
+  stepLabel: string;
+  stepsCompleted: number;
+  stepsTotal: number;
+}
+
+function ProgressDisplay({ step, stepLabel, stepsCompleted, stepsTotal }: ProgressDisplayProps) {
+  const pct = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
+
+  return (
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center px-4">
+      <div className="w-full max-w-xs space-y-8">
+
+        {/* Header */}
+        <div className="text-center">
+          <p className="text-[10px] tracking-[0.35em] uppercase text-gold mb-2">Audit FEC</p>
+          <h2 className="text-lg font-semibold text-ink">Analyse en cours</h2>
+          <p className="text-xs text-ink-faint mt-1">{stepLabel || "Initialisation…"}</p>
+        </div>
+
+        {/* Progress bar */}
+        <div>
+          <div className="flex justify-between text-[10px] text-ink-faint mb-2 tracking-wider">
+            <span className="uppercase">Progression</span>
+            <span>{stepsCompleted}/{stepsTotal} étapes</span>
+          </div>
+          <div className="w-full h-0.5 bg-edge rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gold transition-all duration-700 ease-out rounded-full"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Step list */}
+        <ul className="space-y-3">
+          {PIPELINE_STEPS.map(({ key, label }, i) => {
+            const isDone    = i < stepsCompleted;
+            const isActive  = key === step;
+            const isPending = !isDone && !isActive;
+
+            return (
+              <li
+                key={key}
+                className={`flex items-center gap-3 text-sm transition-colors ${
+                  isDone   ? "text-emerald-400" :
+                  isActive ? "text-gold"         :
+                             "text-ink-faint"
+                }`}
+              >
+                {/* Icon */}
+                <span className="w-5 h-5 flex items-center justify-center shrink-0">
+                  {isDone ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : isActive ? (
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                  ) : (
+                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-40" />
+                  )}
+                </span>
+
+                {/* Label */}
+                <span className={isActive ? "font-medium" : ""}>{label}</span>
+              </li>
+            );
+          })}
+        </ul>
+
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ResultsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { data } = useAnalysis(id);
+  const progress = useProgress(id); // always called — hooks must not be conditional
   const [drawerRow, setDrawerRow] = useState<ReconciliationRow | null>(null);
   const [filterStatus, setFilterStatus] = useState<RowStatus | "all">("all");
 
   if (!data) return <Spinner />;
 
-  // ── Processing ──────────────────────────────────────────────────────────────
+  // ── Processing — show live step progress ────────────────────────────────────
   if (data.status === "pending" || data.status === "processing") {
     return (
-      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center gap-4">
-        <svg className="animate-spin w-7 h-7 text-gold" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-        </svg>
-        <div className="text-center">
-          <p className="text-sm font-medium text-ink">Analyse en cours…</p>
-          <p className="text-xs text-ink-faint mt-1 tracking-wide">
-            Extraction FEC · PDF · Commentaires IA
-          </p>
-        </div>
-      </div>
+      <ProgressDisplay
+        step={progress?.step ?? ""}
+        stepLabel={progress?.step_label ?? "Initialisation…"}
+        stepsCompleted={progress?.steps_completed ?? 0}
+        stepsTotal={progress?.steps_total ?? 4}
+      />
     );
   }
 
