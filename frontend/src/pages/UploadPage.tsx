@@ -87,9 +87,9 @@ export default function UploadPage() {
           {/* FEC */}
           <div>
             <label className="block text-[10px] tracking-widest uppercase text-ink-faint mb-2">
-              FEC DGFiP <span className="normal-case text-ink-faint/60">(.txt)</span>
+              FEC DGFiP <span className="normal-case text-ink-faint/60">(.xlsx ou .txt)</span>
             </label>
-            <DropZone label="Fichier FEC pipe-délimité" accept=".txt" file={fecFile} onFile={setFecFile} />
+            <DropZone label="Fichier FEC Excel ou pipe-délimité" accept=".xlsx,.txt" file={fecFile} onFile={setFecFile} />
           </div>
 
           {/* PDF */}

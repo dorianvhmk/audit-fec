@@ -30,7 +30,11 @@ async def _run_analysis(analysis_id: str):
         update_analysis(analysis_id, "processing")
 
         sb = _get_client()
-        fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.txt")
+        # Try xlsx first (new uploads), fall back to txt (legacy records)
+        try:
+            fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.xlsx")
+        except Exception:
+            fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.txt")
         pdf_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/plaquette.pdf")
 
         fec_result = FECParser.from_bytes(fec_bytes)
