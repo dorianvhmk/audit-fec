@@ -9,9 +9,10 @@ from app.services.supabase_store import get_analysis
 router = APIRouter(tags=["results"])
 
 _STATUS_COLORS = {
-    "OK": "C6EFCE",
-    "écart": "FFEB9C",
-    "absent": "FFC7CE",
+    "OK":     "C6EFCE",  # green
+    "écart":  "FFEB9C",  # yellow
+    "erreur": "FFC7CE",  # red
+    "absent": "E0E0E0",  # gray
 }
 
 
@@ -38,7 +39,7 @@ def export_excel(analysis_id: str):
     ws = wb.active
     ws.title = "Rapprochement"
 
-    headers = ["Poste", "Tableau", "Montant plaquette", "Montant FEC", "Écart", "Statut", "Commentaire"]
+    headers = ["Poste", "Section", "Montant plaquette", "Montant FEC", "Écart (€)", "Écart (%)", "Statut", "Commentaire"]
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True)
@@ -47,10 +48,11 @@ def export_excel(analysis_id: str):
         status = row.get("status", "")
         ws.append([
             row.get("label"),
-            row.get("table_type"),
+            row.get("section"),
             row.get("plaquette_amount"),
             row.get("fec_amount"),
-            row.get("delta"),
+            row.get("delta_abs"),
+            row.get("delta_pct"),
             status,
             row.get("commentary"),
         ])
