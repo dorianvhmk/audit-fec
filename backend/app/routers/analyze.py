@@ -8,11 +8,12 @@ _BACKEND = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 if _BACKEND not in sys.path:
     sys.path.insert(0, _BACKEND)
 
-from app.services.fec_parser import parse_fec
 from app.services.ai_commentary import generate_commentaries_batch
 from app.services.supabase_store import update_analysis, get_analysis, _get_client
-from parsers.pdf_extractor import extract_plaquette_data
-from services.reconciliation import reconcile, fec_result_to_balances
+from parsers.fec_parser import FECParser
+from parsers.pdf_extractor import PDFExtractor
+from parsers.mapping import MAPPING
+from services.reconciliation import reconcile
 from schemas import ReconciliationRow
 
 router = APIRouter(prefix="/analyze", tags=["analyze"])
@@ -32,18 +33,17 @@ async def _run_analysis(analysis_id: str):
         fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.txt")
         pdf_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/plaquette.pdf")
 
-        fec_result = parse_fec(fec_bytes)
-        plaquette_data = extract_plaquette_data(pdf_bytes)
-        fec_balances = fec_result_to_balances(fec_result)
+        fec_result = FECParser.from_bytes(fec_bytes)
+        pdf_result = PDFExtractor.from_bytes(pdf_bytes)
 
-        rows = reconcile(fec_balances, plaquette_data)
+        rows = reconcile(fec_result, pdf_result, MAPPING)
         comments = await generate_commentaries_batch(rows)
 
         results = {
             "rows": [_row_to_dict(r, c) for r, c in zip(rows, comments)],
             "fec_errors": fec_result.errors,
             "fec_row_count": fec_result.row_count,
-            "pdf_sections": {k: v.get("confidence") for k, v in plaquette_data.items()},
+            "pdf_sections": {k: v.get("confidence") for k, v in pdf_result.sections.items()},
         }
 
         update_analysis(analysis_id, "done", results)
