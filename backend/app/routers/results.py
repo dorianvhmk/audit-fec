@@ -4,7 +4,7 @@ from fastapi.responses import StreamingResponse
 import openpyxl
 from openpyxl.styles import PatternFill, Font
 
-from app.services.supabase_store import get_analysis
+from app.services.supabase_store import get_analysis, list_analyses
 
 router = APIRouter(tags=["results"])
 
@@ -14,6 +14,12 @@ _STATUS_COLORS = {
     "erreur": "FFC7CE",  # red
     "absent": "E0E0E0",  # gray
 }
+
+
+@router.get("/analyses")
+def get_analyses():
+    """List the 50 most recent analyses (id, client_name, status, created_at)."""
+    return list_analyses(limit=50)
 
 
 @router.get("/results/{analysis_id}")

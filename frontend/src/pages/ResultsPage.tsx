@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAnalysis, ReconciliationRow, RowStatus, API } from "../hooks/useAnalysis";
 import StatusBadge from "../components/StatusBadge";
 import CommentDrawer from "../components/CommentDrawer";
@@ -118,6 +118,12 @@ export default function ResultsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
+            <Link
+              to="/history"
+              className="text-[10px] tracking-widest uppercase text-ink-faint hover:text-gold transition-colors"
+            >
+              Historique
+            </Link>
             <div className="h-4 w-px bg-edge" />
             <div>
               <p className="text-[10px] tracking-widest uppercase text-gold">Audit FEC</p>

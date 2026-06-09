@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import DropZone from "../components/DropZone";
 import { API } from "../hooks/useAnalysis";
@@ -41,7 +41,14 @@ export default function UploadPage() {
       <div className="w-full max-w-md">
 
         {/* Logo / wordmark */}
-        <div className="mb-10 text-center">
+        <div className="mb-10 text-center relative">
+          <Link
+            to="/history"
+            className="absolute right-0 top-0 text-[10px] tracking-widest uppercase
+                       text-ink-faint hover:text-gold transition-colors"
+          >
+            Historique →
+          </Link>
           <p className="text-xs tracking-[0.35em] uppercase text-ink-faint mb-3">
             Cabinet d'audit
           </p>

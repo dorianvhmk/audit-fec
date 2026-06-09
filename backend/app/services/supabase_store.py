@@ -49,3 +49,16 @@ def get_analysis(analysis_id: str) -> dict | None:
     sb = _get_client()
     data = sb.table("analyses").select("*").eq("id", analysis_id).single().execute()
     return data.data
+
+
+def list_analyses(limit: int = 50) -> list[dict]:
+    """Return the most recent analyses (lightweight — no results JSONB)."""
+    sb = _get_client()
+    data = (
+        sb.table("analyses")
+        .select("id, client_name, status, created_at")
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return data.data or []
