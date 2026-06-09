@@ -18,7 +18,6 @@ export default function UploadPage() {
     if (!canSubmit) return;
     setError(null);
     setLoading(true);
-
     try {
       const form = new FormData();
       form.append("client_name", clientName.trim());
@@ -38,33 +37,36 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-lg">
-        {/* Title */}
-        <div className="mb-8 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-600 mb-4">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Rapprochement FEC / Plaquette</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Déposez les fichiers pour lancer l'analyse automatique
+    <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-md">
+
+        {/* Logo / wordmark */}
+        <div className="mb-10 text-center">
+          <p className="text-xs tracking-[0.35em] uppercase text-ink-faint mb-3">
+            Cabinet d'audit
+          </p>
+          <h1 className="text-2xl font-semibold tracking-tight text-gold">
+            AUDIT FEC
+          </h1>
+          <p className="text-sm text-ink-faint mt-2">
+            Rapprochement FEC / Plaquette financière
           </p>
         </div>
 
-        {/* Form card */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 space-y-5">
+        {/* Card */}
+        <div className="bg-surface border border-edge rounded-sm p-6 space-y-5">
+
           {/* Client name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-[10px] tracking-widest uppercase text-ink-faint mb-2">
               Nom du client
             </label>
             <input
               type="text"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full bg-[#0A0A0A] border border-edge rounded-sm px-3 py-2.5 text-sm
+                         text-ink placeholder-ink-faint
+                         focus:outline-none focus:border-gold focus:ring-0
+                         transition-colors"
               placeholder="Société XYZ"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
@@ -72,46 +74,40 @@ export default function UploadPage() {
             />
           </div>
 
-          {/* FEC drop zone */}
+          {/* Divider */}
+          <div className="border-t border-edge" />
+
+          {/* FEC */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              FEC DGFiP <span className="text-gray-400 font-normal">(.txt)</span>
+            <label className="block text-[10px] tracking-widest uppercase text-ink-faint mb-2">
+              FEC DGFiP <span className="normal-case text-ink-faint/60">(.txt)</span>
             </label>
-            <DropZone
-              label="Fichier FEC pipe-délimité"
-              accept=".txt"
-              file={fecFile}
-              onFile={setFecFile}
-            />
+            <DropZone label="Fichier FEC pipe-délimité" accept=".txt" file={fecFile} onFile={setFecFile} />
           </div>
 
-          {/* PDF drop zone */}
+          {/* PDF */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Plaquette financière <span className="text-gray-400 font-normal">(.pdf)</span>
+            <label className="block text-[10px] tracking-widest uppercase text-ink-faint mb-2">
+              Plaquette financière <span className="normal-case text-ink-faint/60">(.pdf)</span>
             </label>
-            <DropZone
-              label="Plaquette PDF annuelle"
-              accept=".pdf"
-              file={pdfFile}
-              onFile={setPdfFile}
-            />
+            <DropZone label="Rapport annuel PDF" accept=".pdf" file={pdfFile} onFile={setPdfFile} />
           </div>
 
           {/* Error */}
           {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-sm bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
               {error}
             </div>
           )}
 
-          {/* Submit */}
+          {/* CTA */}
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="w-full py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-600
-                       hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed
-                       transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 rounded-sm text-sm font-semibold tracking-wider uppercase
+                       bg-gold text-black hover:bg-gold-light
+                       disabled:opacity-30 disabled:cursor-not-allowed
+                       transition-colors duration-150 flex items-center justify-center gap-2"
           >
             {loading ? (
               <>
@@ -126,6 +122,11 @@ export default function UploadPage() {
             )}
           </button>
         </div>
+
+        {/* Footer hint */}
+        <p className="text-center text-[11px] text-ink-faint mt-6">
+          Données traitées de façon confidentielle · Powered by Claude AI
+        </p>
       </div>
     </div>
   );

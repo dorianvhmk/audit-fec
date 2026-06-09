@@ -22,8 +22,14 @@ export default function DropZone({ label, accept, file, onFile }: Props) {
 
   return (
     <label
-      className={`flex flex-col items-center justify-center w-full h-36 border-2 border-dashed rounded-xl cursor-pointer transition-colors
-        ${over ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-white hover:border-blue-400 hover:bg-gray-50"}`}
+      className={`flex flex-col items-center justify-center w-full h-32 border border-dashed
+        rounded cursor-pointer transition-all duration-150
+        ${over
+          ? "border-gold bg-gold-dim text-gold"
+          : file
+          ? "border-gold/40 bg-gold-dim/50 text-gold"
+          : "border-edge bg-surface text-ink-muted hover:border-gold/60 hover:text-gold/80"
+        }`}
       onDragOver={(e) => { e.preventDefault(); setOver(true); }}
       onDragLeave={() => setOver(false)}
       onDrop={handleDrop}
@@ -34,19 +40,24 @@ export default function DropZone({ label, accept, file, onFile }: Props) {
         accept={accept}
         onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
       />
+
       {file ? (
         <div className="text-center px-4">
-          <p className="text-sm font-medium text-blue-700 truncate max-w-xs">{file.name}</p>
-          <p className="text-xs text-gray-400 mt-1">{(file.size / 1024).toFixed(0)} Ko</p>
+          {/* checkmark */}
+          <svg className="mx-auto mb-1.5 w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          <p className="text-sm font-medium text-gold truncate max-w-xs">{file.name}</p>
+          <p className="text-xs text-ink-faint mt-0.5">{(file.size / 1024).toFixed(0)} Ko</p>
         </div>
       ) : (
         <div className="text-center px-4">
-          <svg className="mx-auto mb-2 w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="mx-auto mb-1.5 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 7.5m0 0L7.5 12M12 7.5v9" />
           </svg>
-          <p className="text-sm font-medium text-gray-600">{label}</p>
-          <p className="text-xs text-gray-400">Glisser-déposer ou cliquer</p>
+          <p className="text-sm font-medium">{label}</p>
+          <p className="text-xs text-ink-faint mt-0.5">Glisser-déposer ou cliquer</p>
         </div>
       )}
     </label>

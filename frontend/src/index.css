@@ -1,7 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+@layer base {
+  html {
+    background-color: #0A0A0A;
+    color: #E8E8E8;
+  }
+
+  body {
+    @apply font-sans antialiased;
+    background-color: #0A0A0A;
+  }
+
+  /* Monospaced numbers everywhere they appear in table cells */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Scrollbar — dark */
+  ::-webkit-scrollbar        { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track  { background: #0A0A0A; }
+  ::-webkit-scrollbar-thumb  { background: #2A2A2A; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
 }

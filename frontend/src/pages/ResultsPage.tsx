@@ -9,7 +9,7 @@ import CommentDrawer from "../components/CommentDrawer";
 const fmtEur = (v: number | null) =>
   v === null
     ? "—"
-    : v.toLocaleString("fr-FR", { maximumFractionDigits: 0 }) + " €";
+    : v.toLocaleString("fr-FR", { maximumFractionDigits: 0 });
 
 const fmtPct = (pct: number | null, abs: number | null) => {
   if (pct === null) return "—";
@@ -17,35 +17,34 @@ const fmtPct = (pct: number | null, abs: number | null) => {
   return `${sign}${pct.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
 };
 
-const truncate = (s: string, n = 60) =>
-  s.length > n ? s.slice(0, n) + "…" : s;
+const truncate = (s: string, n = 55) => (s.length > n ? s.slice(0, n) + "…" : s);
 
-// ── Badge config for summary cards ───────────────────────────────────────────
+// ── Status config ─────────────────────────────────────────────────────────────
 
 const STATUS_ORDER: RowStatus[] = ["erreur", "écart", "absent", "OK"];
 
-const CARD_STYLES: Record<RowStatus, string> = {
-  erreur: "border-red-200    bg-red-50    ring-red-400    text-red-700",
-  écart:  "border-orange-200 bg-orange-50 ring-orange-400 text-orange-700",
-  absent: "border-gray-200   bg-gray-50   ring-gray-400   text-gray-600",
-  OK:     "border-green-200  bg-green-50  ring-green-400  text-green-700",
+const CARD_NUM_COLOR: Record<RowStatus, string> = {
+  erreur: "text-red-400",
+  écart:  "text-amber-400",
+  absent: "text-ink-muted",
+  OK:     "text-emerald-400",
 };
 
-// ── Spinner ──────────────────────────────────────────────────────────────────
+// ── Spinner ───────────────────────────────────────────────────────────────────
 
-function Spinner({ label }: { label: string }) {
+function Spinner() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-gray-500">
-      <svg className="animate-spin w-9 h-9 text-blue-500" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center gap-4">
+      <svg className="animate-spin w-7 h-7 text-gold" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
       </svg>
-      <p className="font-medium text-sm">{label}</p>
+      <p className="text-xs tracking-widest uppercase text-ink-faint">Chargement…</p>
     </div>
   );
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────────
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ResultsPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,33 +53,36 @@ export default function ResultsPage() {
   const [drawerRow, setDrawerRow] = useState<ReconciliationRow | null>(null);
   const [filterStatus, setFilterStatus] = useState<RowStatus | "all">("all");
 
-  // ── Loading ────────────────────────────────────────────────────────────────
-  if (!data) return <Spinner label="Chargement…" />;
+  if (!data) return <Spinner />;
 
-  // ── Processing ────────────────────────────────────────────────────────────
+  // ── Processing ──────────────────────────────────────────────────────────────
   if (data.status === "pending" || data.status === "processing") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-gray-600">
-        <svg className="animate-spin w-10 h-10 text-blue-500" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <div className="min-h-screen bg-[#0A0A0A] flex flex-col items-center justify-center gap-4">
+        <svg className="animate-spin w-7 h-7 text-gold" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
         </svg>
-        <p className="font-semibold">Analyse en cours…</p>
-        <p className="text-sm text-gray-400">Extraction FEC · PDF · Commentaires IA</p>
+        <div className="text-center">
+          <p className="text-sm font-medium text-ink">Analyse en cours…</p>
+          <p className="text-xs text-ink-faint mt-1 tracking-wide">
+            Extraction FEC · PDF · Commentaires IA
+          </p>
+        </div>
       </div>
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────────────────────
+  // ── Error ───────────────────────────────────────────────────────────────────
   if (data.status === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="max-w-md text-center space-y-3">
-          <p className="text-red-600 font-semibold">Erreur lors de l'analyse</p>
-          <p className="text-sm text-gray-500">{data.results?.error ?? "Erreur inconnue"}</p>
+      <div className="min-h-screen bg-[#0A0A0A] flex items-center justify-center p-6">
+        <div className="max-w-sm text-center space-y-3">
+          <p className="text-xs tracking-widest uppercase text-red-400 mb-2">Erreur d'analyse</p>
+          <p className="text-sm text-ink-muted">{data.results?.error ?? "Erreur inconnue"}</p>
           <button
             onClick={() => navigate("/")}
-            className="text-sm text-blue-600 hover:underline"
+            className="mt-4 text-xs tracking-wider uppercase text-gold hover:text-gold-light transition-colors"
           >
             ← Nouvelle analyse
           </button>
@@ -89,7 +91,7 @@ export default function ResultsPage() {
     );
   }
 
-  // ── Done ──────────────────────────────────────────────────────────────────
+  // ── Done ────────────────────────────────────────────────────────────────────
   const rows = data.results?.rows ?? [];
   const filtered =
     filterStatus === "all" ? rows : rows.filter((r) => r.status === filterStatus);
@@ -98,146 +100,156 @@ export default function ResultsPage() {
     STATUS_ORDER.map((s) => [s, rows.filter((r) => r.status === s).length])
   ) as Record<RowStatus, number>;
 
-  const handleExport = () => {
-    window.open(`${API}/export/${id}`, "_blank");
-  };
+  const handleExport = () => window.open(`${API}/export/${id}`, "_blank");
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div>
+      <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
+
+        {/* ── Top bar ────────────────────────────────────────────────────── */}
+        <header className="bg-surface border-b border-edge px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-5">
             <button
               onClick={() => navigate("/")}
-              className="text-xs text-gray-400 hover:text-gray-600 mb-1 flex items-center gap-1"
+              className="text-ink-faint hover:text-gold transition-colors"
+              title="Nouvelle analyse"
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Nouvelle analyse
             </button>
-            <h1 className="font-semibold text-gray-900">{data.client_name}</h1>
-            <p className="text-xs text-gray-400 mt-0.5">
-              {data.results?.fec_row_count?.toLocaleString("fr-FR")} écritures FEC
-            </p>
+            <div className="h-4 w-px bg-edge" />
+            <div>
+              <p className="text-[10px] tracking-widest uppercase text-gold">Audit FEC</p>
+              <p className="text-sm font-semibold text-ink">{data.client_name}</p>
+            </div>
           </div>
-          <button
-            onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300
-                       text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z" />
-            </svg>
-            Exporter Excel
-          </button>
+
+          <div className="flex items-center gap-4">
+            <p className="text-xs text-ink-faint hidden sm:block">
+              {data.results?.fec_row_count?.toLocaleString("fr-FR")} écritures
+            </p>
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 px-4 py-2 text-xs tracking-wider uppercase
+                         border border-edge rounded-sm text-ink-muted
+                         hover:border-gold/60 hover:text-gold transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z" />
+              </svg>
+              Excel
+            </button>
+          </div>
         </header>
 
-        {/* ── Summary cards ───────────────────────────────────────────────── */}
-        <div className="px-6 py-4 flex flex-wrap gap-3 items-center">
+        {/* ── Summary strip ──────────────────────────────────────────────── */}
+        <div className="px-6 py-4 flex flex-wrap gap-2 items-center border-b border-edge">
           {STATUS_ORDER.map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(filterStatus === s ? "all" : s)}
-              className={`rounded-xl border px-4 py-3 text-left transition-all min-w-[100px]
-                ${CARD_STYLES[s]}
-                ${filterStatus === s ? "ring-2 ring-offset-1" : "hover:opacity-90"}`}
+              className={`flex items-center gap-3 px-4 py-2.5 border rounded-sm transition-all
+                ${filterStatus === s
+                  ? "border-gold/40 bg-gold-dim"
+                  : "border-edge bg-surface hover:border-edge/80"}`}
             >
-              <p className="text-2xl font-bold text-gray-900">{counts[s]}</p>
-              <p className="text-xs capitalize mt-0.5">{s}</p>
+              <span className={`text-xl font-semibold tabular-nums ${CARD_NUM_COLOR[s]}`}>
+                {counts[s]}
+              </span>
+              <span className="text-[10px] tracking-widest uppercase text-ink-faint">{s}</span>
             </button>
           ))}
+
           {filterStatus !== "all" && (
             <button
               onClick={() => setFilterStatus("all")}
-              className="text-xs text-blue-600 hover:underline ml-1"
+              className="ml-1 text-[10px] tracking-wider uppercase text-gold hover:text-gold-light transition-colors"
             >
               Tout afficher
             </button>
           )}
+
+          <span className="ml-auto text-xs text-ink-faint">
+            {filtered.length} poste{filtered.length !== 1 ? "s" : ""}
+          </span>
         </div>
 
-        {/* ── Table ───────────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-auto px-6 pb-10">
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-64">
-                    Poste
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    FEC
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Plaquette
-                  </th>
-                  <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Δ %
-                  </th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Statut
-                  </th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Commentaire
-                  </th>
-                  <th className="w-8" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row, i) => (
-                  <tr
-                    key={i}
-                    onClick={() => setDrawerRow(row)}
-                    className="border-b border-gray-100 hover:bg-blue-50/40 cursor-pointer transition-colors"
+        {/* ── Table ──────────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b border-edge bg-surface">
+                {[
+                  ["Poste",       "text-left   px-6 py-3"],
+                  ["FEC",         "text-right  px-4 py-3"],
+                  ["Plaquette",   "text-right  px-4 py-3"],
+                  ["Δ %",         "text-right  px-4 py-3"],
+                  ["Statut",      "text-center px-4 py-3"],
+                  ["Commentaire", "text-left   px-4 py-3"],
+                  ["",            "w-6 px-3"],
+                ].map(([label, cls]) => (
+                  <th
+                    key={label}
+                    className={`${cls} text-[10px] tracking-widest uppercase text-ink-faint font-medium`}
                   >
-                    <td className="px-4 py-3 font-medium text-gray-800 truncate max-w-xs">
-                      {row.label}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-gray-700 whitespace-nowrap">
-                      {fmtEur(row.fec_amount)}
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono text-gray-700 whitespace-nowrap">
-                      {fmtEur(row.plaquette_amount)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right font-mono whitespace-nowrap
-                        ${row.delta_pct !== null && row.delta_pct >= 5
-                          ? "text-red-600 font-semibold"
-                          : row.delta_pct !== null && row.delta_pct >= 1
-                          ? "text-orange-600 font-medium"
-                          : "text-gray-500"}`}
-                    >
-                      {fmtPct(row.delta_pct, row.delta_abs)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <StatusBadge status={row.status} />
-                    </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs max-w-[260px] truncate">
-                      {row.commentary ? truncate(row.commentary) : <em>—</em>}
-                    </td>
-                    <td className="px-3 py-3 text-gray-300">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </td>
-                  </tr>
+                    {label}
+                  </th>
                 ))}
-              </tbody>
-            </table>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((row, i) => (
+                <tr
+                  key={i}
+                  onClick={() => setDrawerRow(row)}
+                  className="border-b border-edge/50 hover:bg-surface cursor-pointer transition-colors group"
+                >
+                  <td className="px-6 py-3 font-medium text-ink text-sm max-w-[220px] truncate">
+                    {row.label}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-ink-muted tabular-nums whitespace-nowrap">
+                    {fmtEur(row.fec_amount)}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono text-xs text-ink-muted tabular-nums whitespace-nowrap">
+                    {fmtEur(row.plaquette_amount)}
+                  </td>
+                  <td className={`px-4 py-3 text-right font-mono text-xs tabular-nums whitespace-nowrap
+                    ${row.delta_pct !== null && row.delta_pct >= 5
+                      ? "text-red-400 font-semibold"
+                      : row.delta_pct !== null && row.delta_pct >= 1
+                      ? "text-amber-400"
+                      : "text-ink-faint"}`}
+                  >
+                    {fmtPct(row.delta_pct, row.delta_abs)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <StatusBadge status={row.status} />
+                  </td>
+                  <td className="px-4 py-3 text-xs text-ink-faint max-w-[240px] truncate">
+                    {row.commentary ? truncate(row.commentary) : <span className="italic">—</span>}
+                  </td>
+                  <td className="px-3 py-3 text-ink-faint group-hover:text-gold transition-colors">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-            {filtered.length === 0 && (
-              <p className="text-center text-sm text-gray-400 py-14">
-                Aucun poste à afficher.
+          {filtered.length === 0 && (
+            <div className="py-20 text-center">
+              <p className="text-xs tracking-widest uppercase text-ink-faint">
+                Aucun poste à afficher
               </p>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Drawer ──────────────────────────────────────────────────────────── */}
       <CommentDrawer row={drawerRow} onClose={() => setDrawerRow(null)} />
     </>
   );
