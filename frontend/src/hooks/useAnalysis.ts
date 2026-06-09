@@ -1,19 +1,23 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-const API = "/api";
+// In production VITE_API_URL = "https://xxx.up.railway.app"
+// In local dev it is undefined and Vite proxies /api → localhost:8000
+export const API = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
-export type RowStatus = "OK" | "écart" | "absent";
+export type RowStatus = "OK" | "écart" | "erreur" | "absent";
 
 export interface ReconciliationRow {
   label: string;
-  table_type: string;
+  section: string;
   plaquette_amount: number | null;
+  exercice_n1: number | null;
   fec_amount: number | null;
-  delta: number | null;
-  status: RowStatus;
   matched_accounts: string[];
   pcg_prefixes_used: string[];
+  delta_abs: number | null;
+  delta_pct: number | null;
+  status: RowStatus;
   commentary: string;
 }
 
@@ -25,9 +29,8 @@ export interface AnalysisRecord {
   results?: {
     rows: ReconciliationRow[];
     fec_errors: string[];
-    pdf_errors: string[];
     fec_row_count: number;
-    pdf_page_count: number;
+    pdf_sections: Record<string, number | null>;
     error?: string;
   };
 }
@@ -41,7 +44,7 @@ export function useAnalysis(analysisId: string | undefined) {
   useEffect(() => {
     if (!analysisId) return;
 
-    const fetch = async () => {
+    const poll = async () => {
       try {
         setLoading(true);
         const res = await axios.get<AnalysisRecord>(`${API}/results/${analysisId}`);
@@ -57,9 +60,11 @@ export function useAnalysis(analysisId: string | undefined) {
       }
     };
 
-    fetch();
-    intervalRef.current = setInterval(fetch, 3000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    poll();
+    intervalRef.current = setInterval(poll, 3000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [analysisId]);
 
   return { data, loading, error };
