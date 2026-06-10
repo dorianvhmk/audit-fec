@@ -9,6 +9,7 @@ from app.services.supabase_store import (
     list_analyses,
     get_analysis_step,
     STEP_LABELS,
+    cancel_analysis,
 )
 
 router = APIRouter(tags=["results"])
@@ -65,6 +66,15 @@ def get_progress(analysis_id: str):
             "steps_total": n_steps,
         }
 
+    if status == "cancelled":
+        return {
+            "status": "cancelled",
+            "step": "",
+            "step_label": "Annulé",
+            "steps_completed": 0,
+            "steps_total": n_steps,
+        }
+
     # pending or processing
     step = get_analysis_step(analysis_id) or ""
     idx = (step_keys.index(step) + 1) if step in step_keys else 0
@@ -81,6 +91,24 @@ def get_progress(analysis_id: str):
 def get_analyses():
     """List the 50 most recent analyses (id, client_name, status, created_at)."""
     return list_analyses(limit=50)
+
+
+@router.delete("/analyses/{analysis_id}")
+def delete_analysis(analysis_id: str):
+    """
+    Cancel an in-progress analysis.
+
+    Sets status to "cancelled" in Supabase and raises the in-process flag so
+    the background pipeline aborts at its next checkpoint.
+    Returns 400 if the analysis has already finished (done/error/cancelled).
+    """
+    record = get_analysis(analysis_id)
+    if not record:
+        raise HTTPException(404, "Analyse introuvable")
+    if record["status"] in ("done", "error", "cancelled"):
+        raise HTTPException(400, f"L'analyse est déjà terminée (statut : {record['status']})")
+    cancel_analysis(analysis_id)
+    return {"analysis_id": analysis_id, "status": "cancelled"}
 
 
 @router.get("/results/{analysis_id}")

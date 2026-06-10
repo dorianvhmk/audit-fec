@@ -24,7 +24,7 @@ export interface ReconciliationRow {
 export interface AnalysisRecord {
   id: string;
   client_name: string;
-  status: "pending" | "processing" | "done" | "error";
+  status: "pending" | "processing" | "done" | "error" | "cancelled";
   created_at: string;
   results?: {
     rows: ReconciliationRow[];
@@ -37,7 +37,7 @@ export interface AnalysisRecord {
 
 /** Shape returned by GET /progress/:id */
 export interface ProgressInfo {
-  status: "pending" | "processing" | "done" | "error";
+  status: "pending" | "processing" | "done" | "error" | "cancelled";
   /** Machine key, e.g. "parsing_fec" | "extracting_pdf" | "reconciling" | "generating_comments" */
   step: string;
   /** Human-readable French label for the current step */
@@ -64,7 +64,7 @@ export function useAnalysis(analysisId: string | undefined) {
         setLoading(true);
         const res = await axios.get<AnalysisRecord>(`${API}/results/${analysisId}`);
         setData(res.data);
-        if (res.data.status === "done" || res.data.status === "error") {
+        if (res.data.status === "done" || res.data.status === "error" || res.data.status === "cancelled") {
           if (intervalRef.current) clearInterval(intervalRef.current);
           setLoading(false);
         }
@@ -99,7 +99,7 @@ export function useProgress(analysisId: string | undefined) {
         const res = await axios.get<ProgressInfo>(`${API}/progress/${analysisId}`);
         setProgress(res.data);
         // Stop polling once analysis is no longer in-flight
-        if (res.data.status === "done" || res.data.status === "error") {
+        if (res.data.status === "done" || res.data.status === "error" || res.data.status === "cancelled") {
           if (intervalRef.current) clearInterval(intervalRef.current);
         }
       } catch {

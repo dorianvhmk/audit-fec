@@ -45,6 +45,31 @@ def get_analysis_step(analysis_id: str) -> str | None:
     """Return the current step key, or None if not yet set / already done."""
     return _step_registry.get(analysis_id)
 
+
+# ---------------------------------------------------------------------------
+# In-process cancellation registry
+# ---------------------------------------------------------------------------
+
+_cancel_registry: dict[str, bool] = {}  # analysis_id → True if cancelled
+
+
+def cancel_analysis(analysis_id: str) -> None:
+    """
+    Mark an analysis for cancellation and persist the status to Supabase.
+
+    Sets the in-process flag immediately (so the pipeline stops at the next
+    checkpoint) then writes status="cancelled" to the database.
+    """
+    _cancel_registry[analysis_id] = True
+    # update_analysis is defined below — forward reference resolved at call time
+    update_analysis(analysis_id, "cancelled")
+
+
+def is_cancelled(analysis_id: str) -> bool:
+    """Return True if the analysis has been cancelled."""
+    return _cancel_registry.get(analysis_id, False)
+
+
 _client: Client | None = None
 
 

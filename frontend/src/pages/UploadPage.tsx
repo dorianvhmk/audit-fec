@@ -1,16 +1,27 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import axios from "axios";
 import DropZone from "../components/DropZone";
 import { API } from "../hooks/useAnalysis";
 
 export default function UploadPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [clientName, setClientName] = useState("");
   const [fecFile, setFecFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(
+    (location.state as { toast?: string } | null)?.toast ?? null
+  );
+
+  // Auto-dismiss toast after 4 s
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const canSubmit = clientName.trim() && fecFile && pdfFile && !loading;
 
@@ -59,6 +70,18 @@ export default function UploadPage() {
             Rapprochement FEC / Plaquette financière
           </p>
         </div>
+
+        {/* Toast */}
+        {toast && (
+          <div className="mb-4 flex items-center gap-3 rounded-sm border border-amber-500/30
+                          bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" />
+            </svg>
+            {toast}
+          </div>
+        )}
 
         {/* Card */}
         <div className="bg-surface border border-edge rounded-sm p-6 space-y-5">

@@ -8,7 +8,7 @@ import { API } from "../hooks/useAnalysis";
 interface AnalysisSummary {
   id: string;
   client_name: string;
-  status: "pending" | "processing" | "done" | "error";
+  status: "pending" | "processing" | "done" | "error" | "cancelled";
   created_at: string;
 }
 
@@ -30,6 +30,7 @@ const STATUS_STYLE: Record<AnalysisSummary["status"], string> = {
   pending:    "bg-amber-500/10   text-amber-400   border-amber-500/20",
   processing: "bg-amber-500/10   text-amber-400   border-amber-500/20",
   error:      "bg-red-500/10     text-red-400     border-red-500/20",
+  cancelled:  "bg-zinc-500/10    text-zinc-400    border-zinc-500/20",
 };
 
 const STATUS_LABEL: Record<AnalysisSummary["status"], string> = {
@@ -37,6 +38,7 @@ const STATUS_LABEL: Record<AnalysisSummary["status"], string> = {
   pending:    "En attente",
   processing: "En cours",
   error:      "Erreur",
+  cancelled:  "Annulé",
 };
 
 function StatusChip({ status }: { status: AnalysisSummary["status"] }) {
@@ -55,8 +57,9 @@ export default function HistoryPage() {
   const [rows, setRows] = useState<AnalysisSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchRows = () => {
     axios
       .get<AnalysisSummary[]>(`${API}/analyses`)
       .then((res) => setRows(res.data))
@@ -64,7 +67,24 @@ export default function HistoryPage() {
         setError(axios.isAxiosError(e) ? e.message : "Erreur de chargement")
       )
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { fetchRows(); }, []);
+
+  const handleCancel = async (id: string) => {
+    setCancellingId(id);
+    try {
+      await axios.delete(`${API}/analyses/${id}`);
+      // Update local state immediately so the button disappears
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: "cancelled" } : r))
+      );
+    } catch {
+      // Ignore — row may have already finished
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] flex flex-col">
@@ -149,16 +169,30 @@ export default function HistoryPage() {
                       <StatusChip status={row.status} />
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        onClick={() => navigate(`/results/${row.id}`)}
-                        disabled={row.status !== "done"}
-                        className="text-xs tracking-wider uppercase px-3 py-1.5 rounded-sm border
-                                   border-gold/40 text-gold hover:bg-gold-dim
-                                   disabled:opacity-30 disabled:cursor-not-allowed
-                                   transition-colors"
-                      >
-                        Voir résultats
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {(row.status === "pending" || row.status === "processing") && (
+                          <button
+                            onClick={() => handleCancel(row.id)}
+                            disabled={cancellingId === row.id}
+                            className="text-xs tracking-wider uppercase px-3 py-1.5 rounded-sm border
+                                       border-red-500/40 text-red-400 hover:bg-red-500/10
+                                       disabled:opacity-40 disabled:cursor-not-allowed
+                                       transition-colors"
+                          >
+                            {cancellingId === row.id ? "…" : "Annuler"}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => navigate(`/results/${row.id}`)}
+                          disabled={row.status !== "done"}
+                          className="text-xs tracking-wider uppercase px-3 py-1.5 rounded-sm border
+                                     border-gold/40 text-gold hover:bg-gold-dim
+                                     disabled:opacity-30 disabled:cursor-not-allowed
+                                     transition-colors"
+                        >
+                          Voir résultats
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

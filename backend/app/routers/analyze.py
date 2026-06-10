@@ -13,6 +13,7 @@ from app.services.supabase_store import (
     update_analysis,
     get_analysis,
     set_analysis_step,
+    is_cancelled,
     _get_client as _get_supabase,
 )
 from parsers.fec_parser import FECParser
@@ -43,14 +44,23 @@ async def _run_analysis(analysis_id: str):
             fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.txt")
         fec_result = FECParser.from_bytes(fec_bytes)
 
+        if is_cancelled(analysis_id):
+            return  # status already set to "cancelled" by cancel_analysis()
+
         # ── Step 2: Download + extract PDF ──────────────────────────────────
         set_analysis_step(analysis_id, "extracting_pdf")
         pdf_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/plaquette.pdf")
         pdf_result = PDFExtractor.from_bytes(pdf_bytes)
 
+        if is_cancelled(analysis_id):
+            return
+
         # ── Step 3: Reconcile ────────────────────────────────────────────────
         set_analysis_step(analysis_id, "reconciling")
         rows = reconcile(fec_result, pdf_result, MAPPING)
+
+        if is_cancelled(analysis_id):
+            return
 
         # ── Step 4: Generate commentaries (single batch API call) ────────────
         set_analysis_step(analysis_id, "generating_comments")

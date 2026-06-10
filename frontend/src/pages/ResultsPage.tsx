@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import axios from "axios";
 import { useAnalysis, useProgress, ReconciliationRow, RowStatus, API } from "../hooks/useAnalysis";
 import StatusBadge from "../components/StatusBadge";
 import CommentDrawer from "../components/CommentDrawer";
@@ -58,9 +59,11 @@ interface ProgressDisplayProps {
   stepLabel: string;
   stepsCompleted: number;
   stepsTotal: number;
+  onCancel: () => void;
+  cancelling: boolean;
 }
 
-function ProgressDisplay({ step, stepLabel, stepsCompleted, stepsTotal }: ProgressDisplayProps) {
+function ProgressDisplay({ step, stepLabel, stepsCompleted, stepsTotal, onCancel, cancelling }: ProgressDisplayProps) {
   const pct = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
 
   return (
@@ -93,7 +96,6 @@ function ProgressDisplay({ step, stepLabel, stepsCompleted, stepsTotal }: Progre
           {PIPELINE_STEPS.map(({ key, label }, i) => {
             const isDone    = i < stepsCompleted;
             const isActive  = key === step;
-            const isPending = !isDone && !isActive;
 
             return (
               <li
@@ -127,6 +129,20 @@ function ProgressDisplay({ step, stepLabel, stepsCompleted, stepsTotal }: Progre
           })}
         </ul>
 
+        {/* Cancel button */}
+        <div className="pt-2 text-center">
+          <button
+            onClick={onCancel}
+            disabled={cancelling}
+            className="text-xs tracking-wider uppercase px-5 py-2 rounded-sm border
+                       border-red-500/40 text-red-400 hover:bg-red-500/10
+                       disabled:opacity-40 disabled:cursor-not-allowed
+                       transition-colors"
+          >
+            {cancelling ? "Annulation…" : "Annuler"}
+          </button>
+        </div>
+
       </div>
     </div>
   );
@@ -141,8 +157,26 @@ export default function ResultsPage() {
   const progress = useProgress(id); // always called — hooks must not be conditional
   const [drawerRow, setDrawerRow] = useState<ReconciliationRow | null>(null);
   const [filterStatus, setFilterStatus] = useState<RowStatus | "all">("all");
+  const [cancelling, setCancelling] = useState(false);
+
+  const handleCancel = async () => {
+    if (!id || cancelling) return;
+    setCancelling(true);
+    try {
+      await axios.delete(`${API}/analyses/${id}`);
+    } catch {
+      // If it already finished between click and request, just navigate anyway
+    }
+    navigate("/", { state: { toast: "Analyse annulée" } });
+  };
 
   if (!data) return <Spinner />;
+
+  // ── Cancelled — redirect immediately ───────────────────────────────────────
+  if (data.status === "cancelled") {
+    navigate("/", { state: { toast: "Analyse annulée" } });
+    return null;
+  }
 
   // ── Processing — show live step progress ────────────────────────────────────
   if (data.status === "pending" || data.status === "processing") {
@@ -152,6 +186,8 @@ export default function ResultsPage() {
         stepLabel={progress?.step_label ?? "Initialisation…"}
         stepsCompleted={progress?.steps_completed ?? 0}
         stepsTotal={progress?.steps_total ?? 4}
+        onCancel={handleCancel}
+        cancelling={cancelling}
       />
     );
   }
