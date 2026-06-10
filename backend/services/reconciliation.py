@@ -3,23 +3,24 @@ Reconciliation engine.
 
 Public signature
 ----------------
-    from parsers.fec_parser   import FECParser
+    from parsers.bg_parser    import BGParser
     from parsers.pdf_extractor import PDFExtractor
     from parsers.mapping       import MAPPING
     from services.reconciliation import reconcile
 
-    fec  = FECParser("fec.txt").parse()
-    pdf  = PDFExtractor("plaquette.pdf").extract()
-    rows = reconcile(fec, pdf, MAPPING)
+    bg   = BGParser.from_bytes(raw_xlsx)
+    pdf  = PDFExtractor.from_bytes(raw_pdf)
+    rows = reconcile(bg, pdf, MAPPING)
 
 Parameters
 ----------
-fec     : FECResult   — output of FECParser.parse()
+bg      : BGResult    — output of BGParser.from_bytes() / BGParser.parse()
+          (also accepts FECResult for backward compatibility — both expose
+           to_balances_dict() with the same dict[str, float] signature)
 pdf     : PDFResult   — output of PDFExtractor.extract()
 mapping : dict[str, list[str]]
-              Label → list of CompteNum prefixes.
-              Typically ``parsers.mapping.MAPPING``, but a custom dict can be
-              passed to override or extend coverage.
+              Label → list of Compte prefixes.
+              Typically ``parsers.mapping.MAPPING``.
 
 Returns
 -------
@@ -30,17 +31,16 @@ Status thresholds
   OK     |delta%| < 1 %
   écart  1 % ≤ |delta%| < 5 %
   erreur |delta%| ≥ 5 %
-  absent no FEC accounts matched OR plaquette_amount is None
+  absent no BG accounts matched OR plaquette_amount is None
 
 Sign convention
 ---------------
-FEC soldes are (total_debit − total_credit).  Because the plaquette always
-shows positive figures we compare ``abs(fec_sum)`` against the plaquette
-amount.  This works for all cases:
-  • Net assets  : sum(debit) + sum(contra credit) → correct net
-  • Liabilities : credit-balance accounts → negative solde → abs → positive
-  • Revenue     : credit solde → abs → positive
-  • Expense     : debit solde → positive already
+BG net balances are (Solde_debit − Solde_credit).  Because the plaquette always
+shows positive figures we compare ``abs(bg_sum)`` against the plaquette amount.
+  • Net assets  : debit-balance accounts → positive already
+  • Liabilities : credit-balance accounts → negative → abs → positive
+  • Revenue     : credit balance → negative → abs → positive
+  • Expense     : debit balance → positive already
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ from schemas import ReconciliationRow, ReconciliationStatus
 # Forward-declare the imported types for type hints without circular imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from parsers.fec_parser    import FECResult
+    from parsers.bg_parser     import BGResult
     from parsers.pdf_extractor import PDFResult
 
 # ---------------------------------------------------------------------------
@@ -71,17 +71,17 @@ _THRESHOLD_ECART = 5.0   # percent
 # ---------------------------------------------------------------------------
 
 
-def _sum_fec(
+def _sum_bg(
     balances: dict[str, float],
     prefixes: list[str],
 ) -> tuple[float, list[str]]:
-    """Sum net soldes for every account whose CompteNum starts with any prefix."""
+    """Sum net balances for every account whose Compte string starts with any prefix."""
     total   = 0.0
     matched: list[str] = []
-    for compte_num, solde in balances.items():
-        if any(compte_num.startswith(p) for p in prefixes):
-            total += solde
-            matched.append(compte_num)
+    for compte, net in balances.items():
+        if any(compte.startswith(p) for p in prefixes):
+            total += net
+            matched.append(compte)
     return total, sorted(matched)
 
 
@@ -100,7 +100,7 @@ def _make_absent(
     section: str,
     plaquette_amount: float | None,
     exercice_n1: float | None,
-    fec_amount: float | None,
+    bg_amount: float | None,
     matched: list[str],
     prefixes: list[str],
 ) -> ReconciliationRow:
@@ -109,7 +109,7 @@ def _make_absent(
         section=section,
         plaquette_amount=plaquette_amount,
         exercice_n1=exercice_n1,
-        fec_amount=fec_amount,
+        bg_amount=bg_amount,
         matched_accounts=matched,
         pcg_prefixes_used=prefixes,
         delta_abs=None,
@@ -124,12 +124,12 @@ def _make_absent(
 
 
 def reconcile(
-    fec:     "FECResult",
+    bg:      "BGResult",
     pdf:     "PDFResult",
     mapping: dict[str, list[str]],
 ) -> list[ReconciliationRow]:
     """
-    Reconcile a parsed FEC against a parsed plaquette using *mapping*.
+    Reconcile a parsed Balance Générale against a parsed plaquette using *mapping*.
 
     Each plaquette row becomes one :class:`~schemas.ReconciliationRow`.
     Rows that are pure section headers (no plaquette amount) are included
@@ -137,8 +137,9 @@ def reconcile(
 
     Parameters
     ----------
-    fec :
-        Result of ``FECParser(...).parse()``.
+    bg :
+        Result of ``BGParser.from_bytes()``.  Also accepts FECResult (duck
+        typing — both expose ``to_balances_dict() → dict[str, float]``).
     pdf :
         Result of ``PDFExtractor(...).extract()``.
     mapping :
@@ -150,8 +151,8 @@ def reconcile(
     -------
     list[ReconciliationRow]
     """
-    # Flat {CompteNum: net_solde} dict — built once, reused for every row
-    fec_balances: dict[str, float] = fec.to_balances_dict()
+    # Flat {Compte_str: net_balance} dict — built once, reused for every row
+    bg_balances: dict[str, float] = bg.to_balances_dict()
 
     rows: list[ReconciliationRow] = []
 
@@ -174,41 +175,41 @@ def reconcile(
                                          None, [], []))
                 continue
 
-            raw_fec, matched = _sum_fec(fec_balances, prefixes)
+            raw_bg, matched = _sum_bg(bg_balances, prefixes)
 
-            # ── No FEC accounts matched the prefixes ──────────────────────
+            # ── No BG accounts matched the prefixes ───────────────────────
             if not matched:
                 rows.append(_make_absent(label, section, exercice_n, exercice_n1,
                                          None, [], prefixes))
                 continue
 
-            fec_amount = abs(raw_fec)   # plaquette figures are always positive
+            bg_amount = abs(raw_bg)   # plaquette figures are always positive
 
             # ── Section header row (no plaquette amount) ──────────────────
             if exercice_n is None:
                 rows.append(_make_absent(label, section, None, exercice_n1,
-                                         fec_amount, matched, prefixes))
+                                         bg_amount, matched, prefixes))
                 continue
 
             # ── Normal reconciliation ─────────────────────────────────────
-            delta_abs = fec_amount - exercice_n
+            delta_abs = bg_amount - exercice_n
 
             if exercice_n != 0.0:
                 delta_pct = round(abs(delta_abs / exercice_n) * 100.0, 4)
             else:
-                delta_pct = 0.0 if fec_amount == 0.0 else 100.0
+                delta_pct = 0.0 if bg_amount == 0.0 else 100.0
 
             rows.append(ReconciliationRow(
-                label            = label,
-                section          = section,
-                plaquette_amount = exercice_n,
-                exercice_n1      = exercice_n1,
-                fec_amount       = round(fec_amount, 2),
-                matched_accounts = matched,
-                pcg_prefixes_used= prefixes,
-                delta_abs        = round(delta_abs, 2),
-                delta_pct        = delta_pct,
-                status           = _status(delta_pct),
+                label             = label,
+                section           = section,
+                plaquette_amount  = exercice_n,
+                exercice_n1       = exercice_n1,
+                bg_amount         = round(bg_amount, 2),
+                matched_accounts  = matched,
+                pcg_prefixes_used = prefixes,
+                delta_abs         = round(delta_abs, 2),
+                delta_pct         = delta_pct,
+                status            = _status(delta_pct),
             ))
 
     return rows

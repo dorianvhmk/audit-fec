@@ -65,7 +65,7 @@ export default function CommentDrawer({ row, onClose }: Props) {
           {/* KPI grid */}
           <div className="grid grid-cols-2 gap-2">
             <KpiTile label="Montant plaquette" value={fmtEur(row.plaquette_amount)} />
-            <KpiTile label="Montant FEC"       value={fmtEur(row.fec_amount)} />
+            <KpiTile label="Montant BG"        value={fmtEur(row.bg_amount)} />
             <KpiTile
               label="Écart (€)"
               value={deltaStr}
@@ -90,7 +90,7 @@ export default function CommentDrawer({ row, onClose }: Props) {
           {row.matched_accounts.length > 0 && (
             <div>
               <p className="text-[10px] tracking-widest uppercase text-ink-faint mb-2">
-                Comptes FEC imputés
+                Comptes BG imputés
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {row.matched_accounts.map((a) => (

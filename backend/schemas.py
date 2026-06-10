@@ -28,22 +28,22 @@ class ReconciliationRow(BaseModel):
         None, description="Prior-year amount from the plaquette (exercice N-1), for reference."
     )
 
-    # FEC side
-    fec_amount: float | None = Field(
-        None, description="Computed amount from FEC balances using PCG mapping."
+    # Balance Générale side
+    bg_amount: float | None = Field(
+        None, description="Computed amount from Balance Générale using PCG mapping."
     )
     matched_accounts: list[str] = Field(
         default_factory=list,
-        description="List of CompteNum values that contributed to fec_amount.",
+        description="List of Compte values that contributed to bg_amount.",
     )
     pcg_prefixes_used: list[str] = Field(
         default_factory=list,
-        description="PCG prefixes from mapping.py that were used to filter FEC accounts.",
+        description="PCG prefixes from mapping.py that were used to filter BG accounts.",
     )
 
     # Reconciliation result
     delta_abs: float | None = Field(
-        None, description="Absolute delta: fec_amount − plaquette_amount."
+        None, description="Absolute delta: bg_amount − plaquette_amount."
     )
     delta_pct: float | None = Field(
         None,
@@ -57,7 +57,7 @@ class ReconciliationRow(BaseModel):
             "OK      — |delta%| < 1 %\n"
             "écart   — 1 % ≤ |delta%| < 5 %\n"
             "erreur  — |delta%| ≥ 5 %\n"
-            "absent  — no FEC accounts matched the PCG mapping"
+            "absent  — no BG accounts matched the PCG mapping"
         )
     )
     commentary: str = Field(

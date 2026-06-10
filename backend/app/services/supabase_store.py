@@ -27,7 +27,7 @@ from app.config import settings
 
 #: Human-readable step labels — order defines the progress bar sequence.
 STEP_LABELS: dict[str, str] = {
-    "parsing_fec":         "Lecture du FEC",
+    "parsing_bg":          "Lecture de la Balance Générale",
     "extracting_pdf":      "Extraction de la plaquette PDF",
     "reconciling":         "Rapprochement des données",
     "generating_comments": "Génération des commentaires IA",

@@ -48,7 +48,7 @@ function Spinner() {
 // ── Step-progress pipeline display ───────────────────────────────────────────
 
 const PIPELINE_STEPS = [
-  { key: "parsing_fec",         label: "Lecture du FEC" },
+  { key: "parsing_bg",          label: "Lecture de la BG" },
   { key: "extracting_pdf",      label: "Extraction PDF" },
   { key: "reconciling",         label: "Rapprochement" },
   { key: "generating_comments", label: "Commentaires IA" },
@@ -72,7 +72,7 @@ function ProgressDisplay({ step, stepLabel, stepsCompleted, stepsTotal, onCancel
 
         {/* Header */}
         <div className="text-center">
-          <p className="text-[10px] tracking-[0.35em] uppercase text-gold mb-2">Audit FEC</p>
+          <p className="text-[10px] tracking-[0.35em] uppercase text-gold mb-2">Audit BG</p>
           <h2 className="text-lg font-semibold text-ink">Analyse en cours</h2>
           <p className="text-xs text-ink-faint mt-1">{stepLabel || "Initialisation…"}</p>
         </div>
@@ -245,14 +245,14 @@ export default function ResultsPage() {
             </Link>
             <div className="h-4 w-px bg-edge" />
             <div>
-              <p className="text-[10px] tracking-widest uppercase text-gold">Audit FEC</p>
+              <p className="text-[10px] tracking-widest uppercase text-gold">Audit BG</p>
               <p className="text-sm font-semibold text-ink">{data.client_name}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             <p className="text-xs text-ink-faint hidden sm:block">
-              {data.results?.fec_row_count?.toLocaleString("fr-FR")} écritures
+              {data.results?.bg_row_count?.toLocaleString("fr-FR")} comptes
             </p>
             <button
               onClick={handleExport}
@@ -308,7 +308,7 @@ export default function ResultsPage() {
               <tr className="border-b border-edge bg-surface">
                 {[
                   ["Poste",       "text-left   px-6 py-3"],
-                  ["FEC",         "text-right  px-4 py-3"],
+                  ["BG",          "text-right  px-4 py-3"],
                   ["Plaquette",   "text-right  px-4 py-3"],
                   ["Δ %",         "text-right  px-4 py-3"],
                   ["Statut",      "text-center px-4 py-3"],
@@ -335,7 +335,7 @@ export default function ResultsPage() {
                     {row.label}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-xs text-ink-muted tabular-nums whitespace-nowrap">
-                    {fmtEur(row.fec_amount)}
+                    {fmtEur(row.bg_amount)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-xs text-ink-muted tabular-nums whitespace-nowrap">
                     {fmtEur(row.plaquette_amount)}

@@ -12,7 +12,7 @@ export interface ReconciliationRow {
   section: string;
   plaquette_amount: number | null;
   exercice_n1: number | null;
-  fec_amount: number | null;
+  bg_amount: number | null;
   matched_accounts: string[];
   pcg_prefixes_used: string[];
   delta_abs: number | null;
@@ -28,8 +28,8 @@ export interface AnalysisRecord {
   created_at: string;
   results?: {
     rows: ReconciliationRow[];
-    fec_errors: string[];
-    fec_row_count: number;
+    bg_errors: string[];
+    bg_row_count: number;
     pdf_sections: Record<string, number | null>;
     error?: string;
   };
@@ -38,7 +38,7 @@ export interface AnalysisRecord {
 /** Shape returned by GET /progress/:id */
 export interface ProgressInfo {
   status: "pending" | "processing" | "done" | "error" | "cancelled";
-  /** Machine key, e.g. "parsing_fec" | "extracting_pdf" | "reconciling" | "generating_comments" */
+  /** Machine key, e.g. "parsing_bg" | "extracting_pdf" | "reconciling" | "generating_comments" */
   step: string;
   /** Human-readable French label for the current step */
   step_label: string;

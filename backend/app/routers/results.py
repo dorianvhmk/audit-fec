@@ -31,7 +31,7 @@ def get_progress(analysis_id: str):
 
         {
           "status":          "pending" | "processing" | "done" | "error",
-          "step":            "parsing_fec" | "extracting_pdf" | "reconciling"
+          "step":            "parsing_bg" | "extracting_pdf" | "reconciling"
                              | "generating_comments" | "done" | "",
           "step_label":      str,        # human-readable French label
           "steps_completed": int,        # 0-based count of finished steps
@@ -134,7 +134,7 @@ def export_excel(analysis_id: str):
     ws = wb.active
     ws.title = "Rapprochement"
 
-    headers = ["Poste", "Section", "Montant plaquette", "Montant FEC", "Écart (€)", "Écart (%)", "Statut", "Commentaire"]
+    headers = ["Poste", "Section", "Montant plaquette", "Montant BG", "Écart (€)", "Écart (%)", "Statut", "Commentaire"]
     ws.append(headers)
     for cell in ws[1]:
         cell.font = Font(bold=True)
@@ -145,7 +145,7 @@ def export_excel(analysis_id: str):
             row.get("label"),
             row.get("section"),
             row.get("plaquette_amount"),
-            row.get("fec_amount"),
+            row.get("bg_amount"),
             row.get("delta_abs"),
             row.get("delta_pct"),
             status,

@@ -103,7 +103,7 @@ export default function HistoryPage() {
           </button>
           <div className="h-4 w-px bg-edge" />
           <div>
-            <p className="text-[10px] tracking-widest uppercase text-gold">Audit FEC</p>
+            <p className="text-[10px] tracking-widest uppercase text-gold">Audit BG</p>
             <p className="text-sm font-semibold text-ink">Historique des analyses</p>
           </div>
         </div>

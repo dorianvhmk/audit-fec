@@ -35,8 +35,8 @@ _MODEL = "claude-sonnet-4-6"
 
 _SYSTEM_PROMPT = """\
 Tu es commissaire aux comptes (CAC) chargé d'un audit légal en France.
-Tu analyses les écarts entre le FEC (Fichier des Écritures Comptables) et la
-plaquette financière annuelle de l'entreprise auditée.
+Tu analyses les écarts entre la Balance Générale (BG) et la plaquette
+financière annuelle de l'entreprise auditée.
 
 Pour chaque poste qui t'est soumis (statut "écart", "erreur" ou "absent"),
 tu rédiges un commentaire d'audit en français en 1 à 2 phrases qui :
@@ -47,7 +47,7 @@ tu rédiges un commentaire d'audit en français en 1 à 2 phrases qui :
 Règles :
 - Vocabulaire technique comptable français (PCG, normes ISA/NEP)
 - Factuel et précis ; pas d'hypothèses non étayées par les chiffres
-- Statut "absent" → risque minimum "moyen" (aucun compte FEC trouvé)
+- Statut "absent" → risque minimum "moyen" (aucun compte BG trouvé)
 - Statut "erreur" (écart ≥ 5 %) → risque minimum "élevé"
 - Statut "écart" (1–5 %) → évalue le risque selon le montant absolu
 """
@@ -132,7 +132,7 @@ def _build_prompt(rows: list[ReconciliationRow]) -> str:
             f"[{i}] {row.label}\n"
             f"    Section     : {row.section}\n"
             f"    Plaquette N : {_fmt_amount(row.plaquette_amount)}\n"
-            f"    FEC calculé : {_fmt_amount(row.fec_amount)}\n"
+            f"    BG calculé  : {_fmt_amount(row.bg_amount)}\n"
             f"    Écart       : {delta}\n"
             f"    Statut      : {row.status}\n"
             + (f"    Comptes FEC : {comptes}\n" if comptes else "")

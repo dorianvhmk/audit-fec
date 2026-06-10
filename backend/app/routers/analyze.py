@@ -16,7 +16,8 @@ from app.services.supabase_store import (
     is_cancelled,
     _get_client as _get_supabase,
 )
-from parsers.fec_parser import FECParser
+from parsers.bg_parser import BGParser
+from parsers.fec_parser import FECParser   # kept for legacy Supabase records
 from parsers.pdf_extractor import PDFExtractor
 from parsers.mapping import MAPPING
 from services.reconciliation import reconcile
@@ -36,13 +37,21 @@ async def _run_analysis(analysis_id: str):
         update_analysis(analysis_id, "processing")
         sb = _get_supabase()
 
-        # ── Step 1: Download + parse FEC ────────────────────────────────────
-        set_analysis_step(analysis_id, "parsing_fec")
+        # ── Step 1: Download + parse Balance Générale ────────────────────────
+        set_analysis_step(analysis_id, "parsing_bg")
         try:
-            fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.xlsx")
-        except Exception:
-            fec_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.txt")
-        fec_result = FECParser.from_bytes(fec_bytes)
+            # New uploads store bg.xlsx; fall back to legacy fec.xlsx / fec.txt
+            try:
+                bg_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/bg.xlsx")
+                bg_result = BGParser.from_bytes(bg_bytes)
+            except Exception:
+                try:
+                    bg_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.xlsx")
+                except Exception:
+                    bg_bytes = sb.storage.from_("audit-files").download(f"{analysis_id}/fec.txt")
+                bg_result = FECParser.from_bytes(bg_bytes)
+        except Exception as dl_exc:
+            raise RuntimeError(f"Téléchargement Balance Générale impossible : {dl_exc}") from dl_exc
 
         if is_cancelled(analysis_id):
             return  # status already set to "cancelled" by cancel_analysis()
@@ -57,7 +66,7 @@ async def _run_analysis(analysis_id: str):
 
         # ── Step 3: Reconcile ────────────────────────────────────────────────
         set_analysis_step(analysis_id, "reconciling")
-        rows = reconcile(fec_result, pdf_result, MAPPING)
+        rows = reconcile(bg_result, pdf_result, MAPPING)
 
         if is_cancelled(analysis_id):
             return
@@ -68,9 +77,9 @@ async def _run_analysis(analysis_id: str):
 
         # ── Persist results ──────────────────────────────────────────────────
         results = {
-            "rows": [_row_to_dict(r, c) for r, c in zip(rows, comments)],
-            "fec_errors":    fec_result.errors,
-            "fec_row_count": fec_result.row_count,
+            "rows":          [_row_to_dict(r, c) for r, c in zip(rows, comments)],
+            "bg_errors":     bg_result.errors,
+            "bg_row_count":  bg_result.row_count,
             "pdf_sections":  {k: v.get("confidence") for k, v in pdf_result.sections.items()},
         }
         update_analysis(analysis_id, "done", results)

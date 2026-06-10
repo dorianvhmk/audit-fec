@@ -8,7 +8,7 @@ export default function UploadPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [clientName, setClientName] = useState("");
-  const [fecFile, setFecFile] = useState<File | null>(null);
+  const [bgFile, setBgFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +23,7 @@ export default function UploadPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const canSubmit = clientName.trim() && fecFile && pdfFile && !loading;
+  const canSubmit = clientName.trim() && bgFile && pdfFile && !loading;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -32,7 +32,7 @@ export default function UploadPage() {
     try {
       const form = new FormData();
       form.append("client_name", clientName.trim());
-      form.append("fec_file", fecFile!);
+      form.append("bg_file", bgFile!);
       form.append("pdf_file", pdfFile!);
 
       const { data } = await axios.post<{ analysis_id: string }>(`${API}/upload`, form);
@@ -64,10 +64,10 @@ export default function UploadPage() {
             Cabinet d'audit
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-gold">
-            AUDIT FEC
+            AUDIT BG
           </h1>
           <p className="text-sm text-ink-faint mt-2">
-            Rapprochement FEC / Plaquette financière
+            Rapprochement Balance Générale / Plaquette financière
           </p>
         </div>
 
@@ -107,12 +107,12 @@ export default function UploadPage() {
           {/* Divider */}
           <div className="border-t border-edge" />
 
-          {/* FEC */}
+          {/* Balance Générale */}
           <div>
             <label className="block text-[10px] tracking-widest uppercase text-ink-faint mb-2">
-              FEC DGFiP <span className="normal-case text-ink-faint/60">(.xlsx ou .txt)</span>
+              Balance Générale <span className="normal-case text-ink-faint/60">(.xlsx)</span>
             </label>
-            <DropZone label="Fichier FEC Excel ou pipe-délimité" accept=".xlsx,.txt" file={fecFile} onFile={setFecFile} />
+            <DropZone label="Balance Générale Excel (S&W)" accept=".xlsx" file={bgFile} onFile={setBgFile} />
           </div>
 
           {/* PDF */}
